@@ -141,23 +141,50 @@ func (s Storage) Delete(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
+		s.DeleteFromFriends(user.Id, s.GetAllFriendsId(s.Users[user.Id]))
 		delete(s.Users, user.Id)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("USER WAS DELETED"))
+		w.Write([]byte("User was succesfully deleted!"))
 		return
 	}
 	w.WriteHeader(http.StatusBadRequest)
 }
 
-func (s Storage) DeleteFromFriends(id1, id2 int) {
+func remove(a[]*user.User, ind int) []*user.User{
+	new := make([]*user.User, 0)
+	new = append(new, a[:ind]...)
+	return append(new, a[ind+1:]...)
+}
+func (s Storage) DeleteFromFriends(id1 int, arr []int){
 	if _, ok := s.Users[id1]; !ok {
 		return
 	}
-	for i, _ := range s.Users[id1].Friends {
-		if i == id2 {
+	for _, i := range arr{
+		s.Users[i].Friends = remove(s.Users[i].Friends, s.getFriendsId(s.Users[i], id1))
+	}
+}
 
+func (s Storage) getFriendsId(u *user.User, id int) int{
+	if _, ok := s.Users[u.Id];!ok{
+		return 0
+	}
+	for i, val := range s.Users[u.Id].Friends{
+		if val.Id == id{
+			return i
 		}
 	}
+	return 0
+}
+
+func (s Storage) GetAllFriendsId(u *user.User)[]int{
+	if _, ok := s.Users[u.Id];!ok{
+		return nil
+	}
+	friends := make([]int, 0)
+	for _, val := range s.Users[u.Id].Friends{
+		friends = append(friends, val.Id)
+	}
+	return friends
 }
 
 func (s Storage) SetAge(w http.ResponseWriter, r *http.Request) {
@@ -187,7 +214,7 @@ func (s Storage) SetAge(w http.ResponseWriter, r *http.Request) {
 		}
 		s.Users[u.Id].Age = newAge.NewAge
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("STATUS EPTA"))
+		w.Write([]byte("New age is set"))
 		return
 	}
 	w.WriteHeader(http.StatusBadRequest)
