@@ -98,3 +98,17 @@ func AddFriends(senderId, receiverId int) error{
 	defer db.Close()
 	return nil
 }
+
+func CheckIfIsFriend(userId, friendId int) bool{
+	db, err := sql.Open("postgres", Connection())
+	checkErr(err)
+	querry, err := db.Query(fmt.Sprintf(`select exists(select user_data->'friends'->>'id'=$1 from %s where user_data->'id' =$2) `, table_name), friendId, userId)
+	checkErr(err)
+	var exists bool
+	for querry.Next(){
+		err = querry.Scan(&exists)
+		checkErr(err)
+	}
+	fmt.Println(exists)
+	return exists
+}

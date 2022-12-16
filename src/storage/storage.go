@@ -77,23 +77,28 @@ func (s Storage) MakeFriends(writer http.ResponseWriter, request *http.Request) 
 		sender.Id = f.SourceId
 		receiver.Id = f.TargetId
 		if !database.GetUser(sender.Id){
-			if !database.GetUser(receiver.Id){
-				writer.WriteHeader(http.StatusNotFound)
-				writer.Write([]byte("User with id:" + strconv.Itoa(receiver.Id) + " is not found!"))
-				return
-			}
 			writer.WriteHeader(http.StatusNotFound)
 			writer.Write([]byte("User with id:" + strconv.Itoa(sender.Id) + " is not found!"))
 			return
 		}
-		if err = database.AddFriends(sender.Id, receiver.Id); err != nil{
-			log.Fatal(err)
+		if !database.GetUser(receiver.Id){
+			writer.WriteHeader(http.StatusNotFound)
+			writer.Write([]byte("User with id:" + strconv.Itoa(receiver.Id) + " is not found!"))
+			return
 		}
-		if err = database.AddFriends(receiver.Id, sender.Id); err != nil{
-			log.Fatal(err)
+		if !database.CheckIfIsFriend(sender.Id, receiver.Id){
+			if err = database.AddFriends(sender.Id, receiver.Id); err != nil{
+				log.Fatal(err)
+			}
+			if err = database.AddFriends(receiver.Id, sender.Id); err != nil{
+				log.Fatal(err)
+			}
+			writer.WriteHeader(http.StatusOK)
+			writer.Write([]byte("Id:" + strconv.Itoa(sender.Id) + " and id:" + strconv.Itoa(receiver.Id) + " are friends"))
+			return
 		}
-		writer.WriteHeader(http.StatusOK)
-		writer.Write([]byte("Id:" + strconv.Itoa(sender.Id) + " and id:" + strconv.Itoa(receiver.Id) + " are friends"))
+		writer.WriteHeader(http.StatusAlreadyReported)
+		writer.Write([]byte("Id:" + strconv.Itoa(sender.Id) + " and id:" + strconv.Itoa(receiver.Id) + " are already friends!"))
 		return
 	}
 	writer.WriteHeader(http.StatusBadRequest)
