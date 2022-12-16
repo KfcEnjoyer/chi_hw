@@ -4,13 +4,13 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"net/http"
-	storage2 "serv/src/storage"
+	"serv/src/storage"
 	"serv/src/user"
 )
 
 func main() {
 	e := chi.NewRouter()
-	storage := storage2.Storage{make(map[int]*user.User)}
+	storage := storage.Storage{Users: make(map[int]*user.User)}
 	e.Use(middleware.Logger)
 	e.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("HELLO"))
