@@ -36,7 +36,9 @@ func CreateTable(){
 func AddUser(jsonUser []byte) error{
 	querry := fmt.Sprintf(`INSERT INTO %s (user_data) VALUES ($1)`, table_name)
 	db, err := sql.Open("postgres", Connection())
-	checkErr(err)
+	if checkErr(err){
+		return err
+	}
 	_, err = db.Exec(querry, jsonUser)
 	if checkErr(err){
 		return err
@@ -67,3 +69,17 @@ func GetUser(id int) bool{
 	return exists
 }
 
+func DeleteUser(id int) error{
+	db, err := sql.Open("postgres", Connection())
+	if checkErr(err){
+		return err
+	}
+	query := fmt.Sprintf(`DELETE FROM %s WHERE user_data->>'id' = $1`, table_name)
+	_, err = db.Exec(query, id)
+	if checkErr(err){
+		return err
+	}
+	fmt.Println("DELETED")
+	defer db.Close()
+	return nil
+}
