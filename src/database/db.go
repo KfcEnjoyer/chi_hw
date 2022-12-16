@@ -83,3 +83,18 @@ func DeleteUser(id int) error{
 	defer db.Close()
 	return nil
 }
+
+func AddFriends(senderId, receiverId int) error{
+	db, err := sql.Open("postgres", Connection())
+	if checkErr(err){
+		return err
+	}
+	query := fmt.Sprintf(`update %s set user_data = jsonb_insert(user_data, '{friends, -1}', '{"id":%v}', true) Where user_data->>'id'=$1`, table_name, receiverId)
+	_, err = db.Exec(query, senderId)
+	if checkErr(err){
+		return err
+	}
+	fmt.Println("DELETED")
+	defer db.Close()
+	return nil
+}

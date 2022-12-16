@@ -34,8 +34,9 @@ func (s Storage) Create(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !database.GetUser(u.Id){
-			s.Users[u.Id] = u
-			database.AddUser(content)
+			if err = database.AddUser(content); err != nil{
+				log.Fatal(err)
+			}
 			w.WriteHeader(http.StatusCreated)
 			w.Write([]byte("Created " + u.Username))
 			return
@@ -75,8 +76,8 @@ func (s Storage) MakeFriends(writer http.ResponseWriter, request *http.Request) 
 		}
 		sender.Id = f.SourceId
 		receiver.Id = f.TargetId
-		if _, ok := s.Users[sender.Id]; !ok {
-			if _, ok := s.Users[receiver.Id]; !ok {
+		if !database.GetUser(sender.Id){
+			if !database.GetUser(receiver.Id){
 				writer.WriteHeader(http.StatusNotFound)
 				writer.Write([]byte("User with id:" + strconv.Itoa(receiver.Id) + " is not found!"))
 				return
@@ -85,14 +86,14 @@ func (s Storage) MakeFriends(writer http.ResponseWriter, request *http.Request) 
 			writer.Write([]byte("User with id:" + strconv.Itoa(sender.Id) + " is not found!"))
 			return
 		}
-		if !checkIfIsFriend(s.Users[sender.Id].Friends, s.Users[receiver.Id]) {
-			s.Users[sender.Id].Friends = append(s.Users[sender.Id].Friends, s.Users[receiver.Id])
-			s.Users[receiver.Id].Friends = append(s.Users[receiver.Id].Friends, s.Users[sender.Id])
-			writer.WriteHeader(http.StatusOK)
-			writer.Write([]byte("Id:" + strconv.Itoa(sender.Id) + " and id:" + strconv.Itoa(receiver.Id) + " are friends"))
-			return
+		if err = database.AddFriends(sender.Id, receiver.Id); err != nil{
+			log.Fatal(err)
 		}
-		writer.Write([]byte("Id:" + strconv.Itoa(sender.Id) + " and id:" + strconv.Itoa(receiver.Id) + " already friends"))
+		if err = database.AddFriends(receiver.Id, sender.Id); err != nil{
+			log.Fatal(err)
+		}
+		writer.WriteHeader(http.StatusOK)
+		writer.Write([]byte("Id:" + strconv.Itoa(sender.Id) + " and id:" + strconv.Itoa(receiver.Id) + " are friends"))
 		return
 	}
 	writer.WriteHeader(http.StatusBadRequest)
@@ -146,6 +147,9 @@ func (s Storage) Delete(w http.ResponseWriter, r *http.Request) {
 		if _, ok := s.Users[user.Id]; !ok {
 			w.WriteHeader(http.StatusNotFound)
 			return
+		}
+		if err = database.DeleteUser(user.Id); err != nil{
+			log.Fatal(err)
 		}
 		s.DeleteFromFriends(user.Id, s.GetAllFriendsId(s.Users[user.Id]))
 		delete(s.Users, user.Id)
