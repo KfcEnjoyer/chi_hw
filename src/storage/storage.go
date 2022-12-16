@@ -3,15 +3,17 @@ package storage
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/go-chi/chi/v5"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"serv/src/database"
 	"serv/src/delete_user"
 	"serv/src/make_friends"
 	"serv/src/new_age"
 	"serv/src/user"
 	"strconv"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type Storage struct {
@@ -31,9 +33,13 @@ func (s Storage) Create(w http.ResponseWriter, r *http.Request) {
 			log.Fatal(err)
 			return
 		}
-		s.Users[u.Id] = u
-		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte("Created " + u.Username))
+		if !database.GetUser(u.Id){
+			s.Users[u.Id] = u
+			database.AddUser(content)
+			w.WriteHeader(http.StatusCreated)
+			w.Write([]byte("Created " + u.Username))
+			return
+		}
 		return
 	}
 	w.WriteHeader(http.StatusBadRequest)

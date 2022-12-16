@@ -34,7 +34,7 @@ func CreateTable(){
 }
 
 func AddUser(jsonUser []byte) error{
-	querry := fmt.Sprintf(`INSERT INTO %s (user_data JSONB) VALUES ($1)`, table_name)
+	querry := fmt.Sprintf(`INSERT INTO %s (user_data) VALUES ($1)`, table_name)
 	db, err := sql.Open("postgres", Connection())
 	checkErr(err)
 	_, err = db.Exec(querry, jsonUser)
@@ -53,7 +53,17 @@ func checkErr(err error) bool{
 	return false
 }
 
-func GetUser(id int){
-	
+func GetUser(id int) bool{
+	db, err := sql.Open("postgres", Connection())
+	checkErr(err)
+	querry, err := db.Query(fmt.Sprintf(`SELECT EXISTS(SELECT * FROM %s WHERE user_data->>'id' = $1)`, table_name), id)
+	checkErr(err)
+	var exists bool
+	for querry.Next(){
+		err = querry.Scan(&exists)
+		checkErr(err)
+	}
+	fmt.Println(exists)
+	return exists
 }
 

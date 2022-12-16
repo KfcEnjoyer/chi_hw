@@ -1,14 +1,17 @@
 package main
 
 import (
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"net/http"
+	"serv/src/database"
 	"serv/src/storage"
 	"serv/src/user"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 func main() {
+	database.CreateTable()
 	e := chi.NewRouter()
 	storage := storage.Storage{Users: make(map[int]*user.User)}
 	e.Use(middleware.Logger)
