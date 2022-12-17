@@ -13,6 +13,7 @@ import (
 	"serv/src/user"
 	"strconv"
 
+	
 	"github.com/go-chi/chi/v5"
 )
 
@@ -33,7 +34,7 @@ func (s Storage) Create(w http.ResponseWriter, r *http.Request) {
 			log.Fatal(err)
 			return
 		}
-		if !database.GetUser(u.Id){
+		if !database.CheckUser(u.Id){
 			if err = database.AddUser(content); err != nil{
 				log.Fatal(err)
 			}
@@ -67,30 +68,30 @@ func (s Storage) MakeFriends(writer http.ResponseWriter, request *http.Request) 
 			fmt.Println(err)
 			return
 		}
-		sender := new(user.User)
-		receiver := new(user.User)
 		var f *make_friends.Friend
 		if err := json.Unmarshal(content, &f); err != nil {
 			fmt.Println(err)
 			return
 		}
-		sender.Id = f.SourceId
-		receiver.Id = f.TargetId
-		if !database.GetUser(sender.Id){
+		sender := database.GetUser(f.SourceId)
+		receiver := database.GetUser(f.TargetId)
+		if !database.CheckUser(sender.Id){
 			writer.WriteHeader(http.StatusNotFound)
 			writer.Write([]byte("User with id:" + strconv.Itoa(sender.Id) + " is not found!"))
 			return
 		}
-		if !database.GetUser(receiver.Id){
+		if !database.CheckUser(receiver.Id){
 			writer.WriteHeader(http.StatusNotFound)
 			writer.Write([]byte("User with id:" + strconv.Itoa(receiver.Id) + " is not found!"))
 			return
 		}
 		if !database.CheckIfIsFriend(sender.Id, receiver.Id){
-			if err = database.AddFriends(sender.Id, receiver.Id); err != nil{
+			userData, err := json.Marshal(receiver)
+			if err = database.AddFriends(sender.Id, userData); err != nil{
 				log.Fatal(err)
 			}
-			if err = database.AddFriends(receiver.Id, sender.Id); err != nil{
+			userData, err = json.Marshal(sender)
+			if err = database.AddFriends(receiver.Id, userData); err != nil{
 				log.Fatal(err)
 			}
 			writer.WriteHeader(http.StatusOK)
