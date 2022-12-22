@@ -206,15 +206,13 @@ func (s Storage) SetAge(w http.ResponseWriter, r *http.Request) {
 			fmt.Println(err)
 			return
 		}
-		u := new(user.User)
 		userid := chi.URLParam(r, "userId")
 		realId, err := strconv.Atoi(userid)
 		if err != nil {
 			log.Fatal(err)
 			return
 		}
-		u.Id = realId
-		if _, ok := s.Users[u.Id]; !ok {
+		if !database.CheckUser(realId){
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -223,7 +221,7 @@ func (s Storage) SetAge(w http.ResponseWriter, r *http.Request) {
 			fmt.Println(err)
 			return
 		}
-		s.Users[u.Id].Age = newAge.NewAge
+		database.SetAge(realId, newAge.NewAge)
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("New age is set"))
 		return

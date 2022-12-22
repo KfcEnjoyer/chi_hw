@@ -183,3 +183,14 @@ func GetFriends(userId int) ([]int, error){
 	}
 	return friends, nil
 }
+
+func SetAge(userId, newAge int) error{
+	db, err := sql.Open("postgres", Connection())
+	checkErr(err)
+	query := fmt.Sprintf(`update %s
+	set user_data = jsonb_set(user_data, '{age}', $1)
+	where user_data->>'id' = $2`, table_name)
+ 	_, err = db.Exec(query, newAge, userId)
+	checkErr(err)
+	return nil
+}
