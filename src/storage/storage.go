@@ -50,7 +50,7 @@ func (s Storage) Create(w http.ResponseWriter, r *http.Request) {
 func (s Storage) Get(writer http.ResponseWriter, request *http.Request) {
 	if request.Method == "GET" {
 		response := ""
-		for _, u := range s.Users {
+		for _, u := range database.GetUsers(){
 			response += u.Print()
 		}
 		writer.WriteHeader(http.StatusOK)
@@ -86,12 +86,10 @@ func (s Storage) MakeFriends(writer http.ResponseWriter, request *http.Request) 
 			return
 		}
 		if !database.CheckIfIsFriend(sender.Id, receiver.Id){
-			userData, err := json.Marshal(receiver)
-			if err = database.AddFriends(sender.Id, userData); err != nil{
+			if err = database.AddFriends(sender.Id, receiver.Id); err != nil{
 				log.Fatal(err)
 			}
-			userData, err = json.Marshal(sender)
-			if err = database.AddFriends(receiver.Id, userData); err != nil{
+			if err = database.AddFriends(receiver.Id, sender.Id); err != nil{
 				log.Fatal(err)
 			}
 			writer.WriteHeader(http.StatusOK)
@@ -124,9 +122,15 @@ func (s Storage) ShowFriends(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		u.Id = realId
+		friends, err := database.GetFriends(u.Id)
+		if err != nil{
+			log.Fatal(err)
+			return
+		}
 		response := ""
-		for i := range s.Users[u.Id].Friends {
-			response += fmt.Sprintf("%v Friend's id: %v,  name: %s, age: %d\n", i+1, s.Users[u.Id].Friends[i].Id, s.Users[u.Id].Friends[i].Username, s.Users[u.Id].Friends[i].Age)
+		for _, val := range friends{
+			fmt.Println(val)
+			response += database.GetUser(val).Print()
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(response))
@@ -150,15 +154,15 @@ func (s Storage) Delete(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		user.Id = targetUser.TargetId
-		if _, ok := s.Users[user.Id]; !ok {
+		if !database.CheckUser(user.Id){
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
+		friends, err := database.GetFriends(user.Id)
+		s.DeleteFromFriends(user.Id, friends)
 		if err = database.DeleteUser(user.Id); err != nil{
 			log.Fatal(err)
 		}
-		s.DeleteFromFriends(user.Id, s.GetAllFriendsId(s.Users[user.Id]))
-		delete(s.Users, user.Id)
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("User was succesfully deleted!"))
 		return
@@ -171,34 +175,25 @@ func remove(a[]*user.User, ind int) []*user.User{
 	new = append(new, a[:ind]...)
 	return append(new, a[ind+1:]...)
 }
+
 func (s Storage) DeleteFromFriends(id1 int, arr []int){
-	if _, ok := s.Users[id1]; !ok {
+	if !database.CheckUser(id1){
 		return
 	}
-	for _, i := range arr{
-		s.Users[i].Friends = remove(s.Users[i].Friends, s.getFriendsId(s.Users[i], id1))
+	for i := range arr{
+		database.DeleteFromFriends(arr[i], id1)
 	}
 }
 
-func (s Storage) getFriendsId(u *user.User, id int) int{
-	if _, ok := s.Users[u.Id];!ok{
-		return 0
-	}
-	for i, val := range s.Users[u.Id].Friends{
-		if val.Id == id{
-			return i
-		}
-	}
-	return 0
-}
 
 func (s Storage) GetAllFriendsId(u *user.User)[]int{
 	if _, ok := s.Users[u.Id];!ok{
 		return nil
 	}
-	friends := make([]int, 0)
-	for _, val := range s.Users[u.Id].Friends{
-		friends = append(friends, val.Id)
+	friends, err := database.GetFriends(u.Id)
+	if err!=nil{
+		log.Fatal(err)
+		return nil
 	}
 	return friends
 }

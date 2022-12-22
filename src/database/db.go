@@ -26,21 +26,21 @@ func Connection() string{
 }
 
 func CreateTable(){
-	querry := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (id SERIAL PRIMARY KEY, user_data JSONB)`, table_name)
+	query := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (id SERIAL PRIMARY KEY, user_data JSONB)`, table_name)
 	db, err := sql.Open("postgres", Connection())
 	checkErr(err)
-	_, err = db.Exec(querry)
+	_, err = db.Exec(query)
 	checkErr(err)
 	defer db.Close()
 }
 
 func AddUser(jsonUser []byte) error{
-	querry := fmt.Sprintf(`INSERT INTO %s (user_data) VALUES ($1)`, table_name)
+	query := fmt.Sprintf(`INSERT INTO %s (user_data) VALUES ($1)`, table_name)
 	db, err := sql.Open("postgres", Connection())
 	if checkErr(err){
 		return err
 	}
-	_, err = db.Exec(querry, jsonUser)
+	_, err = db.Exec(query, jsonUser)
 	if checkErr(err){
 		return err
 	} 
@@ -59,11 +59,11 @@ func checkErr(err error) bool{
 func CheckUser(id int) bool{
 	db, err := sql.Open("postgres", Connection())
 	checkErr(err)
-	querry, err := db.Query(fmt.Sprintf(`SELECT EXISTS(SELECT * FROM %s WHERE user_data->>'id' = $1)`, table_name), id)
+	query, err := db.Query(fmt.Sprintf(`SELECT EXISTS(SELECT * FROM %s WHERE user_data->>'id' = $1)`, table_name), id)
 	checkErr(err)
 	var exists bool
-	for querry.Next(){
-		err = querry.Scan(&exists)
+	for	query.Next(){
+		err =	query.Scan(&exists)
 		checkErr(err)
 	}
 	fmt.Println(exists)
@@ -73,14 +73,28 @@ func CheckUser(id int) bool{
 func GetUser(id int) *user.User{
 	db, err := sql.Open("postgres", Connection())
 	checkErr(err)
-	querry, err := db.Query(fmt.Sprintf(`SELECT user_data->>'id', user_data->>'name',user_data->>'age' FROM %s WHERE user_data->>'id' = $1`, table_name), id)
+	query, err := db.Query(fmt.Sprintf(`SELECT user_data->>'id', user_data->>'name',user_data->>'age' FROM %s WHERE user_data->>'id' = $1`, table_name), id)
 	checkErr(err)
 	u := new(user.User)
-	for querry.Next(){
-		err = querry.Scan(&u.Id, &u.Username, &u.Age)
+	for	query.Next(){
+		err =	query.Scan(&u.Id, &u.Username, &u.Age)
 		checkErr(err)
 	}
 	return u
+}
+
+func GetUsers() []*user.User{
+	db, err := sql.Open("postgres", Connection())
+	checkErr(err)
+	query, err := db.Query(fmt.Sprintf(`SELECT user_data->>'id', user_data->>'name',user_data->>'age' FROM %s`, table_name))
+	checkErr(err)
+	users := make([]*user.User, 0)
+	for	query.Next(){
+		u := new(user.User)
+		err =	query.Scan(&u.Id, &u.Username, &u.Age)
+		users = append(users, u)
+	}
+	return users
 }
 
 func DeleteUser(id int) error{
@@ -98,13 +112,13 @@ func DeleteUser(id int) error{
 	return nil
 }
 
-func AddFriends(senderId int, userData []byte) error{
+func AddFriends(senderId, receiverId int) error{
 	db, err := sql.Open("postgres", Connection())
 	if checkErr(err){
 		return err
 	}
-	query := fmt.Sprintf(`update %s set user_data = jsonb_insert(user_data, '{friends,-1}', $1, true) where user_data->>'id'= $2`, table_name)
-	_, err = db.Exec(query, userData, senderId)
+	query := fmt.Sprintf(`update %s set user_data = jsonb_insert(user_data, '{friends,-1}', '{"id":%v}', true) where user_data->>'id'= $1`, table_name, receiverId)
+	_, err = db.Exec(query,  senderId)
 	if checkErr(err){
 		return err
 	}
@@ -116,12 +130,56 @@ func AddFriends(senderId int, userData []byte) error{
 func CheckIfIsFriend(userId, friendId int) bool{
 	db, err := sql.Open("postgres", Connection())
 	checkErr(err)
-	querry, err := db.Query(fmt.Sprintf(`select exists(select * from %s where user_data->>'id' =$1 and user_data->'friends' @> '[{"id":%v}]')`, table_name, userId), friendId)
+	query, err := db.Query(fmt.Sprintf(`select exists(select * from %s where user_data->>'id' =$1 and user_data->'friends' @> '[{"id":%v}]')`, table_name, userId), friendId)
 	checkErr(err)
 	var exists bool
-	for querry.Next(){
-		err = querry.Scan(&exists)
+	for	query.Next(){
+		err =	query.Scan(&exists)
 		checkErr(err)
 	}
 	return exists
+}
+
+func deleteScript(){
+	db, err := sql.Open("postgres", Connection())
+	checkErr(err)
+	query := `create or replace function jsonb_remove_array_element(arr jsonb, element jsonb)
+	returns jsonb language sql immutable as $$
+		select arr- (
+			select ordinality- 1
+			from jsonb_array_elements(arr) with ordinality
+			where value = element)::int
+	$$;`
+	_, err = db.Exec(query)
+	defer db.Close()
+}
+
+func DeleteFromFriends(userId, friendsId int){
+	deleteScript()
+	db, err := sql.Open("postgres", Connection())
+	checkErr(err)
+	query := fmt.Sprintf(`
+	update %s
+	set user_data = jsonb_set(user_data, '{friends}', jsonb_remove_array_element(user_data->'friends', '{"id":%v}'))
+	where user_data->'friends'  @> '[{"id":%v}]' and user_data->>'id'=$1
+	returning *;`, table_name, friendsId, friendsId)
+	_, err = db.Exec(query, userId)
+	checkErr(err)
+	defer db.Close()
+}
+
+func GetFriends(userId int) ([]int, error){
+	db, err := sql.Open("postgres", Connection())
+	checkErr(err)
+	friends := []int{}
+	query, err := db.Query(fmt.Sprintf(`select user_data->>'id' from %s where user_data->'friends' @> '[{"id":%v}]'`, table_name, userId))
+	checkErr(err)
+	for query.Next(){
+		var i int
+		if err := query.Scan(&i); err != nil{
+			return nil, err
+		}
+		friends = append(friends, i)
+	}
+	return friends, nil
 }
